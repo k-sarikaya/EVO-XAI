@@ -1,0 +1,14 @@
+numpy
+pandas
+scipy
+scikit-learn
+imbalanced-learn
+statsmodels
+liac-arff
+deap
+xgboost
+lightgbm
+catboost
+shap
+matplotlib
+seaborn

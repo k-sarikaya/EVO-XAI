@@ -1,0 +1,4 @@
+Dataset,Original,After_ChiSq,After_VIF,Final,Reduction_%,Features
+child,20,12,5,4,80.0,"A9_Score, A8_Score, A2_Score, A4_Score"
+adolescent,20,9,8,4,80.0,"contry_of_res, A10_Score, A4_Score, A6_Score"
+adult,20,15,5,1,95.0,A6_Score

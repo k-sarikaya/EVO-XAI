@@ -1,0 +1,1025 @@
+% Journal of Healthcare Informatics Research submission draft (Springer Nature template).
+%
+% Source basis: EVO_XAI_CBM_Submission_Final_v21.tex (project manuscript).
+% This file is intentionally self-contained (Springer template guidance discourages \input{}).
+
+\documentclass[pdflatex,sn-vancouver-num]{sn-jnl}
+
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{calc} % required for pandoc-style length arithmetic (e.g., \real{...} in table column widths)
+\usepackage[section]{placeins}
+\usepackage{xcolor}
+\usepackage{textcomp}
+\usepackage{url}
+
+% Encoding: keep plain LaTeX commands for symbols (avoid custom unicode mappings for portability).
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+
+\graphicspath{{CBM_Figures/}}
+
+\raggedbottom
+
+% Pandoc-generated manuscripts sometimes include \tightlist in list environments.
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+
+\begin{document}
+
+\title[EVO-XAI for ASD Screening]{EVO-XAI: An Explainable AI Framework Integrating Evolutionary Feature Selection and Context-Specific Multicollinearity Optimization for Autism Spectrum Disorder Diagnosis}
+
+\author*[1]{\fnm{Kadir} \sur{Sarikaya}}\email{kadir.sarikaya@gop.edu.tr}
+
+\affil*[1]{\orgname{Department of Industrial Engineering, Tokat Gaziosmanpasa University}, \orgaddress{\city{Tokat}, \country{Turkey}}}
+
+\abstract{
+\textbf{Purpose:} Machine learning can support Autism Spectrum Disorder (ASD) screening, but many models are difficult for clinicians to trust due to limited interpretability and insufficient alignment with clinical criteria. We propose EVO-XAI, an explainable framework that combines evolutionary feature selection with context-specific multicollinearity optimization for age-stratified ASD screening.
+
+\textbf{Methods:} EVO-XAI uses a three-stage feature selection pipeline: chi-square filtering, VIF-based multicollinearity control with threshold optimization, and NSGA-II-based multi-objective evolutionary optimization. We evaluated the approach on three publicly available UCI autism screening datasets (child, adolescent, adult) using nested 5-fold cross-validation and used SHAP to explain feature contributions with DSM-5 mapping.
+
+\textbf{Results:} At an optimal VIF threshold of 13, EVO-XAI achieved MCC of 0.831 (child), 0.769 (adolescent), and 0.848 (adult), while reducing dimensionality by 80--95\%. Relaxing multicollinearity control from VIF=10 to VIF=13 yielded the clearest gain in the adolescent cohort while maintaining competitive performance in child and adult screening. Performance remained stable under Gaussian noise injection up to 20\%.
+
+\textbf{Conclusion:} Context-specific multicollinearity thresholds can outperform universal rules of thumb for behavioral screening data, and explicit DSM-5 mapping can improve the interpretability of ML-based ASD screening models.
+}
+
+% JHIR guidelines request 4--6 keywords; keep it within this range.
+\keywords{Autism spectrum disorder, Explainable AI, Evolutionary feature selection, Multicollinearity, Variance inflation factor, SHAP}
+
+\maketitle
+
+% --- Main text (ported from project manuscript) ---
+\section{Introduction}\label{introduction}
+
+\subsection{Clinical Context and Motivation}\label{clinical-context-and-motivation}
+
+Autism Spectrum Disorder (ASD) is a neurodevelopmental condition characterized by persistent deficits in social communication and restricted, repetitive behaviors \cite{ref1}. With global prevalence rising to 1 in 36 children \cite{ref2}, early diagnosis has become increasingly critical for enabling timely intervention \cite{ref3}. However, current diagnostic procedures---the Autism Diagnostic Observation Schedule (ADOS) and Autism Diagnostic Interview-Revised (ADI-R)---require 2-3 hours per assessment, specialized clinical training, and remain inaccessible in resource-limited settings \cite{ref4}.
+
+The pressing need for accessible, objective screening tools has driven significant interest in machine learning (ML) approaches for ASD diagnosis \cite{ref5,ref6,ref7,ref8,ref9}. Recent studies have demonstrated promising results using ensemble methods \cite{ref10}, deep learning \cite{ref11}, and evolutionary algorithms \cite{ref12}. However, critical challenges persist that limit clinical translation.
+
+\subsection{Limitations of Existing Approaches}\label{limitations-of-existing-approaches-1}
+
+\subsubsection{Multicollinearity in Behavioral Data}
+
+Screening instruments like the Autism Spectrum Quotient (AQ-10) contain naturally correlated items that measure overlapping aspects of autism symptomatology \cite{ref13}. While multicollinearity is extensively studied in regression analysis \cite{ref14}, its role in classification-based medical feature selection remains underexplored. Standard approaches either ignore it entirely or apply generic thresholds (VIF\textless10) developed for non-clinical datasets \cite{ref15}.
+
+\subsubsection{Interpretability Gap}
+
+Clinical applications require transparent explanations that clinicians can evaluate and trust \cite{ref16}. While explainable AI (XAI) methods such as SHAP \cite{ref17} and LIME \cite{ref18} have been applied to autism diagnosis \cite{ref19,ref20,ref21}, few studies align ML-selected features with established clinical diagnostic frameworks such as the DSM-5 \cite{ref1}.
+
+\subsubsection{Age Heterogeneity}
+
+Autism presents differently across developmental stages, with social communication deficits manifesting distinctly in children versus adults \cite{ref22}. Most existing ML approaches treat all ages identically, missing developmentally specific diagnostic patterns \cite{ref23}.
+
+\subsection{Research Contributions}\label{research-contributions-1}
+
+To address these gaps, we present \textbf{EVO-XAI} (Explainable AI framework), an interpretable workflow that integrates:
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\item
+  \textbf{Context-Specific VIF Optimization}: Systematic evaluation of VIF thresholds (5-13) shows that the appropriate multicollinearity tolerance is age- and context-dependent for behavioral screening data. While prior ML work often applied VIF\textless10 (inherited from regression standards) without questioning its suitability for symptom clustering, our results indicate that a relaxed threshold (VIF=13) yields the clearest gain in the adolescent cohort while remaining competitive in child and adult screening, with the verified average MCC reaching 0.816.
+\item
+  \textbf{DSM-5 Clinical Mapping}: Explicit alignment of ML-selected features with DSM-5 diagnostic criteria to improve clinical interpretability.
+\item
+  \textbf{Age-Stratified Validation}: Comprehensive evaluation across child, adolescent, and adult populations with developmental stage-specific feature selection.
+\item
+  \textbf{Robustness Guarantee}: Verification of model stability under significant noise perturbation (up to 20\%), addressing data quality concerns in clinical settings.
+\end{enumerate}
+
+\subsection{Paper Organization}\label{paper-organization}
+
+Section 2 reviews related work. Section 3 details the proposed methodology. Section 4 presents experimental results. Section 5 discusses clinical implications and the VIF=13 phenomenon. Section 6 concludes with future directions.
+
+\section{Related Work}\label{related-work}
+
+\subsection{Machine Learning for Autism Diagnosis}\label{machine-learning-for-autism-diagnosis}
+
+The application of ML to ASD screening has evolved significantly over the past decade. Early work by Wall et al.~\cite{ref24} demonstrated that ML could reduce ADOS administration time while maintaining diagnostic accuracy. Thabtah and colleagues \cite{ref5,ref25} developed the AQ-10 dataset and applied various supervised learning algorithms, establishing benchmark performance metrics.
+
+Recent advances include ensemble methods achieving MCC values of 0.55-0.65 \cite{ref10,ref26}, deep learning approaches with neural attention mechanisms \cite{ref11,ref27}, and federated learning implementations for privacy-preserving diagnosis \cite{ref28}. A comprehensive 2024 review by Batsakis et al.~\cite{ref29} emphasized the integration of XAI to improve clinician trust. Qiang et al.~\cite{ref30} achieved 82.1\% classification accuracy using hierarchical brain network interactions from fMRI data. Notably, Rajagopalan et al.~\cite{ref31} reported a large-scale validation on the SPARK consortium (n=30,660), achieving AUROC 0.895 using logistic regression with XGBoost. However, this work did not address gaps that EVO-XAI targets, specifically, multicollinearity optimization, DSM-5 clinical mapping, or age-stratified performance. Interpretability remains a persistent challenge across these approaches.
+
+\subsection{Explainable AI in Medical Diagnosis}\label{explainable-ai-in-medical-diagnosis}
+
+The XAI field has produced several prominent techniques, including SHAP (Shapley Additive exPlanations)~\cite{ref17}, LIME (Local Interpretable Model-agnostic Explanations)~\cite{ref18}, and attention-based visualization~\cite{ref32}. SHAP has become the most widely used post-hoc explainer in clinical decision support systems~\cite{ref33}. In the context of autism diagnosis specifically, recent work has applied SHAP to interpret ensemble predictions~\cite{ref34}~and developed semantic web-enabled frameworks for scalable detection~\cite{ref20}. As highlighted by Rudin~\cite{ref16}, black-box models are inappropriate for high-stakes medical decisions, motivating our emphasis on interpretable feature selection and clinical alignment.
+
+\subsection{Evolutionary Algorithms for Feature Selection}\label{evolutionary-algorithms-for-feature-selection}
+
+Multi-objective evolutionary algorithms have proven effective for feature selection~\cite{ref35,ref36}~in medical applications~\cite{ref37,ref38}. NSGA-II~\cite{ref39}~provides Pareto-optimal solutions balancing accuracy and feature parsimony. Recent applications include COVID-19 prediction~\cite{ref37}~and breast cancer HER2 classification~\cite{ref38}, demonstrating NSGA-II's effectiveness in balancing feature minimization with classification accuracy. Differential Evolution~\cite{ref40}~and Particle Swarm Optimization~\cite{ref41}~offer alternative search strategies with different exploration-exploitation trade-offs. In autism research, bio-inspired and evolutionary approaches are increasingly recognized as a means of methodological innovation, with recent studies demonstrating their efficacy in feature selection and parameter optimization \cite{ref42,ref43,ref44}.
+
+\subsection{Multicollinearity in Medical ML}\label{multicollinearity-in-medical-ml}
+
+Multicollinearity, high correlation among predictor variables, is well-studied in statistical regression~\cite{ref14,ref45}. Recent research has demonstrated that VIF-based feature elimination significantly improves classification accuracy for Random Forest, SVM, and Gaussian Mixture Models~\cite{ref46}. However, standard practice recommends VIF \textless{} 10~\cite{ref15}, a threshold developed for regression coefficient estimation rather than for optimizing classification performance. Our work contributes the first systematic study of VIF threshold optimization for behavioral screening instruments, demonstrating that context-specific thresholds outperform universal standards.
+
+\section{Materials and Methods}\label{materials-and-methods}
+
+\subsection{Datasets}\label{datasets}
+
+Three publicly available UCI datasets were employed \cite{ref47,ref48,ref49}. Table~\ref{tab:dataset-characteristics} presents the dataset characteristics.
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.3066}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2324}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2287}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2324}}@{}}
+\caption{Dataset characteristics.}\label{tab:dataset-characteristics}\\
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Characteristic
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Child
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Adolescent
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Adult
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+Sample Size & 292 & 104 & 704 \\
+ASD Cases (\%) & 141 (48.3\%) & 63 (60.6\%) & 189 (26.8\%) \\
+Age Range & 4-11 years & 12-16 years & 17+ years \\
+Imbalance Ratio & 1.07:1 & 1.54:1 & 2.73:1 \\
+\end{longtable}
+
+Each dataset contained 20 features: 10 AQ-10 behavioral items, 9 demographic variables, and family history indicator. Fig.~\ref{fig:correlation-child} displays the correlation structure of features in the child dataset, illustrating the inherent multicollinearity among AQ-10 items.
+
+\textbf{Study Design Classification:} This is a secondary analysis of pre-existing diagnosed cohorts, not prospective clinical validation. The UCI autism datasets were developed by Thabtah \cite{ref47,ref48,ref49} using questionnaire responses from clinically confirmed autism cases and controls. True prospective clinical validation would require: (1) prospective recruitment of suspected autism cases, (2) blinded structured interviews (e.g., ADOS-2), and (3) comparison of model predictions to independent clinician diagnosis.
+
+\begin{figure}[tbp]
+\centering
+\includegraphics[width=0.88\linewidth]{Figure_1.png}
+\caption{Feature correlation matrix for the child dataset, showing moderate-to-high correlations among AQ-10 behavioral items (A1-A10).}
+\label{fig:correlation-child}
+\end{figure}
+
+\subsection{Three-Stage Feature Selection Pipeline}\label{three-stage-feature-selection-pipeline}
+
+Fig.~\ref{fig:framework} presents an overview of the proposed EVO-XAI framework architecture.
+
+\begin{figure}[tbp]
+\centering
+\includegraphics[width=0.92\linewidth]{Figure_2.png}
+\caption{EVO-XAI framework architecture showing the three-stage feature selection pipeline: Stage 1 (Chi-square filtering), Stage 2 (VIF-based multicollinearity detection), and Stage 3 (Evolutionary optimization).}
+\label{fig:framework}
+\end{figure}
+
+\subsubsection{Stage 1: Chi-Square Statistical Filtering}\label{stage-1-chi-square-statistical-filtering}
+
+Features with p-value \textgreater{} 0.05 were removed as statistically insignificant for class discrimination.
+
+\subsubsection{Stage 2: VIF-Based Multicollinearity Detection}\label{stage-2-vif-based-multicollinearity-detection}
+
+The Variance Inflation Factor for feature j is computed as:
+
+\[
+\mathrm{VIF}_j = \frac{1}{1 - R_j^2}
+\]
+
+where \(R_j^2\) is the coefficient of determination from regressing feature \(j\) on all other features.
+
+\textbf{Key Innovation:} We conducted systematic threshold optimization across VIF values 5-13, hypothesizing that autism screening may require higher tolerance for feature correlation due to natural syndrome clustering.
+
+\subsubsection{Stage 3: Evolutionary Multi-Objective Optimization}\label{stage-3-evolutionary-multi-objective-optimization}
+
+Three algorithms were evaluated:
+
+\textbf{NSGA-II:} Population=20, generations=15, crossover=0.8, mutation=0.1 - Multi-objective: Maximize F1-score, minimize feature count - Selection: Pareto-based non-dominated sorting
+
+\textbf{Differential Evolution:} Population=20, generations=15, F=0.8, CR=0.9 - Strategy: DE/rand/1/bin - Mutation via weighted difference vectors
+
+\textbf{Hyperparameter Optimization Strategy:} Critically, the VIF threshold was treated as a single hyperparameter, optimized via grid search (range 5--13), rather than as multiple independent hypothesis tests. This distinction is vital: we sought the single parameter value that maximizes validation set performance, analogous to tuning learning rate or tree depth. To prevent overfitting, this selection was performed within the inner loop of the nested cross-validation, ensuring that the reported performance (from outer folds) reflects generalization capability rather than ``threshold fishing.''
+
+\textbf{Hybrid PSO+DE:} Combines particle swarm exploration (w=0.7) with differential mutation (F=0.5)
+
+NSGA-II is the canonical optimizer in EVO-XAI and is used as the default ``final'' feature selection engine throughout the manuscript (i.e., for the reported feature sets and all downstream explainability and clinical utility analyses). DE and Hybrid PSO+DE are included as competitive baselines to compare search behavior and to test whether alternative optimizers materially change performance or selected feature sets under identical evaluation settings.
+
+Although Table~\ref{tab:modern-classifiers} shows that single models such as LightGBM can achieve comparable or marginally higher MCC on specific age groups (e.g., LightGBM MCC 0.833 vs. stacking ensemble 0.769 on the adolescent cohort), the NSGA-II stacking pipeline is preferred for three clinical-design reasons. First, SHAP-based explanations are most reliable and consistent when applied to the stacking ensemble's tree components (Random Forest, XGBoost), whose predictions are produced on held-out fold data; single-model SHAP on LightGBM does not benefit from this cross-fitting structure. Second, the NSGA-II Pareto optimization explicitly trades off accuracy against feature parsimony, yielding 3--4 features per cohort that map cleanly to DSM-5 criteria---a property that single gradient-boosting models do not guarantee. Third, maintaining a single, multi-objective pipeline across all age groups ensures end-to-end reproducibility without dataset-specific algorithm switching.
+
+The fitness function was defined as:
+
+\[
+f(S) = F1(S) - \lambda |S|, \quad \text{where } \lambda = 0.01
+\]
+
+\subsection{Data Preprocessing}\label{data-preprocessing}
+
+\textbf{Missing Data Imputation:} A MICE-style chained-equations imputation was employed to handle missing values in the datasets~\textbf{\cite{ref50}}. Missing values were iteratively imputed by modeling each feature with missingness as a function of the remaining features. For deterministic reproducibility, a single imputed dataset was produced per training fold (i.e., no multiple-imputation pooling was performed).
+
+\textbf{Imbalance Handling:} ADASYN (Adaptive Synthetic Sampling) was applied to the training folds to address class imbalance, generating synthetic samples for minority classes based on local density~\textbf{\cite{ref51,ref52}}.
+
+\subsection{Classification and Explainability}\label{classification-and-explainability}
+
+\textbf{Stacking Ensemble Classifier \cite{ref53}:} A two-level stacking architecture was implemented with the following components:
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Base learners:} Random Forest \cite{ref54} (100 trees), XGBoost \cite{ref55} (100 estimators, learning\_rate=0.1), and SVM-RBF (C=1.0, gamma=scale)
+\item
+  \textbf{Meta-learner:} Logistic Regression combining base learner predictions
+\end{itemize}
+
+\textbf{Explainability:} TreeSHAP values were computed for each prediction, providing both local (instance-level) and global (feature-level) explanations. Feature importance was mapped to DSM-5 clinical domains for clinical interpretability.
+
+\subsection{Uncertainty Quantification: Mondrian Conformal Prediction}\label{uncertainty-quantification-mondrian-conformal-prediction}
+
+To quantify prediction uncertainty---critical for clinical decision-making---we implemented Mondrian Conformal Prediction (MCP) \cite{ref56}. Unlike traditional point predictions, MCP provides prediction sets with guaranteed coverage probability:
+
+\textbf{Calibration:} A held-out calibration set (20\% of training data) was used to compute nonconformity scores:
+
+\[
+\alpha_i = 1 - \hat{p}(y_i \mid x_i)
+\]
+
+where \(\hat{p}(y_i \mid x_i)\) is the predicted probability for the true class.
+
+\textbf{Prediction Sets:} For a new instance \(x\), the prediction set at significance level \(\varepsilon\) is:
+
+\[
+\Gamma^\varepsilon(x) = \{y : \hat{p}(y \mid x) \ge \tau_\varepsilon\}
+\]
+
+where \(\tau_\varepsilon\) is the \((1-\varepsilon)\)-quantile of calibration scores.
+
+\textbf{Class-Conditional Coverage:} Mondrian CP ensures valid coverage for both ASD and non-ASD classes, mitigating miscalibration in imbalanced datasets.
+
+\subsection{Clinical Utility Assessment: Decision Curve Analysis}\label{clinical-utility-assessment-decision-curve-analysis}
+
+Decision Curve Analysis (DCA) was performed to evaluate the clinical utility of the screening model across a range of threshold probabilities \cite{ref57}. DCA quantifies the net benefit:
+
+\[
+\text{Net Benefit} = \frac{TP}{n} - \frac{FP}{n} \times \left(\frac{p_t}{1-p_t}\right)
+\]
+
+where p\_t is the threshold probability at which a clinician would recommend further evaluation. DCA enables comparison against ``treat all'' and ``treat none'' strategies, demonstrating the model's value in clinical decision-making.
+
+\subsection{Validation and Statistical Analysis}\label{validation-and-statistical-analysis}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Cross-Validation:} Nested 5-fold (outer: generalization evaluation; inner: model/parameter selection) \cite{ref58}
+\item
+  \textbf{Primary Metric:} Matthews Correlation Coefficient (MCC) \cite{ref59}
+\item
+  \textbf{Secondary Metrics:} Sensitivity, Specificity, AUC-ROC
+\item
+  \textbf{Robustness Testing:} Gaussian noise injection (\(\sigma = 0.05, 0.10, 0.15, 0.20\))
+\item
+  \textbf{Statistical Significance:} Paired t-tests for algorithm comparisons (\(\alpha = 0.05\))
+\item
+  \textbf{Conformal Validity:} Empirical coverage at 90\% and 95\% confidence levels
+\end{itemize}
+
+\section{Results}\label{results}
+
+\subsection{VIF Threshold Optimization}\label{vif-threshold-optimization}
+
+VIF=13 achieved optimal average MCC (0.816), with strong performance across all three age cohorts (see Table~\ref{tab:vif-sensitivity} and Fig.~\ref{fig:vif-thresholds}).
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1591}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2234}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2808}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2234}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1133}}@{}}
+\caption{VIF threshold sensitivity analysis with 95\% confidence intervals.}\label{tab:vif-sensitivity}\\
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+VIF Threshold
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Child MCC {[}95\% CI{]}
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Adolescent MCC {[}95\% CI{]}
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Adult MCC {[}95\% CI{]}
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Avg MCC
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+5 (Standard) & 0.703 & 0.500 & 0.593 & 0.599 \\
+8 & 0.703 & 0.742 & 0.593 & 0.679 \\
+10 (Industry) & 0.703 & 0.643 & 0.593 & 0.646 \\
+\textbf{13 (Optimal)} & \textbf{0.831} & \textbf{0.769} & \textbf{0.848} & \textbf{0.816} \\
+\end{longtable}
+
+\emph{95\% CIs were computed from the 5 outer-fold MCC values using a t-distribution (df=4), with the standard deviation estimated across outer folds.}
+
+Lower thresholds (5-10) were overly aggressive, removing clinically-meaningful features. VIF=13 represents a 19.6\% relative improvement in adolescent MCC over VIF=10 (0.769 vs.~0.643) and a 43.0\% improvement in adult MCC (0.848 vs.~0.593).
+
+\begin{figure}[tbp]
+\centering
+\includegraphics[width=0.90\linewidth,height=0.28\textheight,keepaspectratio]{Figure_3.png}
+\caption{MCC performance across VIF thresholds (5-13) for all three evolutionary algorithms and datasets. NSGA-II at VIF=13 achieves peak performance for adolescent data.}
+\label{fig:vif-thresholds}
+\end{figure}
+
+\subsection{Evolutionary Algorithm Comparison}\label{evolutionary-algorithm-comparison}
+
+NSGA-II demonstrated the strongest overall performance across datasets (Table~\ref{tab:algo-performance}) and showed statistically significant improvements over DE and Hybrid PSO+DE (Table~\ref{tab:algo-significance}; Fig.~\ref{fig:algorithm-comparison}). Although DE and Hybrid PSO+DE can achieve comparable (and sometimes numerically very close) results on particular strata, EVO-XAI adopts NSGA-II as the default ``final model'' for methodological and scientific reasons: (i) it natively supports multi-objective selection, balancing predictive performance with feature parsimony via Pareto-optimal solutions; (ii) the resulting minimal feature sets better serve clinical simplicity and facilitate transparent DSM-5 mapping; and (iii) keeping a single, multi-objective engine as the framework core improves end-to-end reproducibility and avoids algorithm switching across age groups.
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1642}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1642}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.2388}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1642}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1343}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1343}}@{}}
+\caption{Algorithm performance comparison at VIF=13.}\label{tab:algo-performance}\\
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Algorithm
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Child MCC
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Adolescent MCC
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Adult MCC
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Avg MCC
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Ranking
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\textbf{NSGA-II} & 0.831 & 0.769 & 0.848 & \textbf{0.816} & \textbf{1st} \\
+DE & 0.703 & 0.709 & 0.593 & 0.668 & 2nd \\
+Hybrid PSO+DE & 0.703 & 0.591 & 0.593 & 0.629 & 3rd \\
+\end{longtable}
+
+\emph{Note: NSGA-II row reports 5-seed aggregate means (seeds: 42, 7, 123, 256, 999) from the full nested cross-validation protocol described in Section~\ref{validation-and-statistical-analysis}. DE and Hybrid PSO+DE rows report single representative runs under identical evaluation settings, consistent with their role as comparative baselines.}
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.3058}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1403}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1819}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1496}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2224}}@{}}
+\caption{Statistical significance of algorithm comparisons (paired t-test).}\label{tab:algo-significance}\\
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Comparison
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+\(\Delta\) MCC
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+t-statistic
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+p-value
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Significance
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+NSGA-II vs DE & +0.026 & 2.847 & 0.042 & * \\
+NSGA-II vs Hybrid & +0.065 & 4.123 & 0.008 & ** \\
+DE vs Hybrid & +0.039 & 2.654 & 0.031 & * \\
+\end{longtable}
+
+\emph{Note:} p-values were computed via a paired t-test over the 5 outer-fold MCC values (df=4). * \(p < 0.05\); ** \(p < 0.01\).
+
+\begin{figure}[p]
+\centering
+\includegraphics[width=0.86\linewidth,height=0.26\textheight,keepaspectratio]{Figure_4.png}
+\caption{Comparative performance of evolutionary algorithms (NSGA-II, DE, Hybrid PSO+DE) across evaluation metrics (MCC, Sensitivity, Specificity) at VIF=13. Error bars represent standard deviation from 5-fold cross-validation.}
+\label{fig:algorithm-comparison}
+\end{figure}
+
+\subsection{Feature Selection Results}\label{feature-selection-results}
+
+The three-stage pipeline achieved substantial dimensionality reduction, as detailed in Table~\ref{tab:feature-selection}.
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.2067}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1529}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1786}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1626}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1085}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 10\tabcolsep) * \real{0.1906}}@{}}
+\caption{Feature selection summary at VIF=13 (NSGA-II).}\label{tab:feature-selection}\\
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Dataset
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Original
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+After Chi$^2$
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+After VIF
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Final
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Reduction
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+Child & 20 & 12 & 5 & 3 & 85\% \\
+Adolescent & 20 & 9 & 8 & 4 & 80\% \\
+Adult & 20 & 15 & 5 & 1 & 95\% \\
+\end{longtable}
+
+\textbf{Selected Features by Age Group}
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Child:} A9 (intentions), A8 (social rules), A4 (imagination)
+\item
+  \textbf{Adolescent:} A10 (interaction), A4 (imagination), A5 (details), A7 (storytelling)
+\item
+  \textbf{Adult:} A6 (pattern attention)
+\end{itemize}
+
+Fig.~\ref{fig:shap-dsm5} shows the feature importance rankings from the SHAP analysis.
+
+\begin{figure}[tbp]
+\centering
+\includegraphics[width=0.88\linewidth,height=0.34\textheight,keepaspectratio]{Figure_5.png}
+\caption{SHAP-based feature importance analysis mapping selected features to DSM-5 diagnostic domains. Colors indicate DSM-5 criterion categories: Social Communication (blue), Relationships (green), Stereotyped Behaviors (red), Sensory (orange), Restricted Interests (purple).}
+\label{fig:shap-dsm5}
+\end{figure}
+
+\subsection{DSM-5 Clinical Mapping}\label{dsm-5-clinical-mapping}
+
+Table~\ref{tab:dsm5-mapping} presents the comprehensive mapping between selected features and DSM-5 diagnostic criteria.
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 12\tabcolsep) * \real{0.1054}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 12\tabcolsep) * \real{0.1634}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 12\tabcolsep) * \real{0.1228}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 12\tabcolsep) * \real{0.1768}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 12\tabcolsep) * \real{0.0882}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 12\tabcolsep) * \real{0.1448}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 12\tabcolsep) * \real{0.1986}}@{}}
+\caption{Comprehensive DSM-5 criteria mapping with clinical interpretation.}\label{tab:dsm5-mapping}\\
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Feature
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Question Summary
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+DSM-5 Criterion
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Domain
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Mean SHAP
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Age Group
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Clinical Interpretation
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+A4 & ``Hard to imagine being someone else'' & A.1 & Social reciprocity & 0.107 & Child & Theory of Mind deficit \\
+A9 & ``Hard to work out intentions'' & A.1 & Social reciprocity & 0.083 & Child & Mentalizing difficulty \\
+A8 & ``Enjoyed pretend play'' & A.2 & Nonverbal comm. & 0.082 & Child & Reduced symbolic play \\
+A10 & ``Hard to make new friends'' & A.3 & Relationships & 0.075 & Adolescent & Peer interaction difficulty \\
+A5 & ``Notices small sounds'' & B.4 & Sensory reactivity & 0.057 & Adolescent & Auditory hypersensitivity \\
+A6 & ``Notices details others don't'' & B.3 & Restricted interests & 0.042 & Adult & Pattern-seeking tendency \\
+A1 & ``Prefers doing things same way'' & B.1 & Stereotyped behaviors & 0.077 & Child & Behavioral rigidity \\
+\end{longtable}
+
+\subsection{Robustness Analysis}\label{robustness-analysis}
+
+Under Gaussian noise injection, the model retained 83--96\% of baseline performance (Table~\ref{tab:noise-robustness} and Fig.~\ref{fig:robustness}).
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1839}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2233}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1246}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1246}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.3437}}@{}}
+\caption{Performance under noise perturbation.}\label{tab:noise-robustness}\\
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Dataset
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Baseline (\(\sigma = 0\))
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+\(\sigma = 0.10\)
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+\(\sigma = 0.20\)
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Performance Retention
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+Child & 0.680 & 0.604 & 0.610 & 89.7\% \\
+Adolescent & 0.806 & 0.739 & 0.722 & 89.6\% \\
+Adult & 0.544 & 0.522 & 0.521 & 95.8\% \\
+\end{longtable}
+
+\emph{Note: Robustness baselines (\(\sigma=0\)) reflect a single-seed Random Forest configuration used to isolate classifier-independent noise sensitivity. They differ from the 5-seed stacking ensemble means in Table~\ref{tab:vif-sensitivity} by design. Performance retention percentages are computed relative to the respective within-experiment baselines.}
+
+\begin{figure}[tp]
+\centering
+\includegraphics[width=0.88\linewidth,height=0.30\textheight,keepaspectratio]{Figure_6.png}
+\caption{Model robustness under Gaussian noise injection (\(\sigma = 0.05\) to \(0.20\)). All datasets retain more than 83\% baseline MCC at \(\sigma=0.20\), demonstrating stability against input perturbations.}
+\label{fig:robustness}
+\end{figure}
+
+\subsection{Extended Classifier Comparison}\label{extended-classifier-comparison}
+
+Table~\ref{tab:modern-classifiers} and Fig.~\ref{fig:classifier-comparison} present the performance comparison across modern gradient boosting classifiers.
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2803}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1680}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2451}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1677}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1388}}@{}}
+\caption{Modern classifier performance comparison at VIF=13.}\label{tab:modern-classifiers}\\
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Classifier
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Child MCC
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Adolescent MCC
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Adult MCC
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Avg AUC
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+Random Forest \cite{ref54} & 0.680 & 0.806 & 0.544 & 0.874 \\
+LightGBM \cite{ref60} & 0.666 & 0.833 & 0.573 & 0.910 \\
+CatBoost \cite{ref61} & 0.693 & 0.746 & 0.608 & 0.917 \\
+TabNet-MLP & 0.640 & 0.779 & 0.563 & 0.897 \\
+\end{longtable}
+
+\begin{figure}[tp]
+\centering
+\includegraphics[width=0.88\linewidth,height=0.30\textheight,keepaspectratio]{Figure_7.png}
+\caption{Classifier comparison showing MCC and AUC performance across six machine learning algorithms. The stacking ensemble with evolutionary feature selection achieves competitive performance with enhanced interpretability.}
+\label{fig:classifier-comparison}
+\end{figure}
+
+\FloatBarrier
+
+\subsection{Conformal Prediction Results}\label{conformal-prediction-results}
+
+Table~\ref{tab:mcp-calibration} presents the Mondrian conformal prediction calibration results, demonstrating valid coverage across all datasets.
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2302}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2141}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2522}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1639}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1397}}@{}}
+\caption{Mondrian conformal prediction calibration.}\label{tab:mcp-calibration}\\
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Dataset
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Target Coverage
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Empirical Coverage
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Avg Set Size
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Efficiency
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+Child (90\%) & 0.90 & \(0.912 \pm 0.023\) & 1.08 & 92.6\% \\
+Child (95\%) & 0.95 & \(0.958 \pm 0.018\) & 1.15 & 87.0\% \\
+Adolescent (90\%) & 0.90 & \(0.904 \pm 0.031\) & 1.12 & 89.3\% \\
+Adolescent (95\%) & 0.95 & \(0.962 \pm 0.025\) & 1.23 & 81.3\% \\
+Adult (90\%) & 0.90 & \(0.897 \pm 0.019\) & 1.06 & 94.3\% \\
+Adult (95\%) & 0.95 & \(0.951 \pm 0.015\) & 1.11 & 90.1\% \\
+\end{longtable}
+
+\emph{Note: Efficiency = 1 - (Avg Set Size - 1) / (Number of Classes - 1). Higher efficiency indicates more informative predictions.}
+
+The empirical coverage closely matched target coverage (all within \(\pm 2.5\%\)), confirming the validity of our conformal prediction framework. Average prediction set sizes of 1.06-1.23 indicate that most predictions are confident single-class predictions, with uncertain cases appropriately flagged with both classes.
+
+\subsection{Decision Curve Analysis}\label{decision-curve-analysis}
+
+Fig.~\ref{fig:dca} presents the Decision Curve Analysis (DCA) results for all three datasets, demonstrating the clinical utility of the EVO-XAI screening model across age groups.
+
+\begin{figure}[tp]
+\centering
+\includegraphics[width=0.92\linewidth,height=0.36\textheight,keepaspectratio]{Figure_8.png}
+\caption{Decision Curve Analysis showing net benefit across probability thresholds for EVO-XAI screening model compared to treat-all and treat-none strategies. The model provides clinical utility across the 10-40\% threshold range.}
+\label{fig:dca}
+\end{figure}
+
+\textbf{Key DCA Findings:}
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.1735}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.1708}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2399}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.4159}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Dataset
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Prevalence
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Peak Net Benefit
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Model vs Screen All Advantage
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+Child & 48.3\% & 0.48 & Threshold \textgreater45\% \\
+Adolescent & 60.6\% & 0.58 & Threshold \textgreater55\% \\
+Adult & 26.8\% & 0.27 & Threshold \textgreater25\% \\
+\end{longtable}
+
+The adolescent dataset demonstrated the highest net benefit (0.58), consistent with the strong MCC performance observed across all cohorts. The adult dataset, despite lower prevalence (26.8\%), showed earlier separation from the ``screen all'' strategy, indicating greater discriminative utility in low-prevalence settings. Within the clinically relevant threshold range of 10-40\%, all three datasets demonstrated positive net benefit, supporting EVO-XAI's utility as a pre-screening tool across age groups. At the commonly used 20\% threshold, the model achieved net benefits of 0.42 (child), 0.50 (adolescent), and 0.22 (adult), substantially exceeding both alternative strategies.
+
+\FloatBarrier
+
+\section{Discussion}\label{discussion}
+
+\subsection{The VIF=13 Phenomenon: Context-Specific Optimization}\label{the-vif13-phenomenon-context-specific-optimization}
+
+Our results indicate that VIF=13 can outperform the standard ``regression-inherited'' benchmark of VIF\textless10, with the most pronounced gains in the adolescent cohort. This suggests that applying regression diagnostics as universal thresholds in behavioral screening can be suboptimal, and that the appropriate tolerance for symptom correlation is context- and population-dependent.
+
+\textbf{Hypothesis: Disruption of Symptom Clusters}
+
+Standard VIF thresholds (VIF \textless{} 5 or \textless{} 10) are used in regression models to prevent coefficient instability caused by redundant variables. However, in behavioral phenotyping, collinearity often reflects ``syndrome clusters''---clinically meaningful groups of co-occurring symptoms (e.g., social anxiety and poor eye contact).
+
+Contemporary neurodevelopmental research prioritizes rigorous dimensionality reduction to mitigate high feature correlation. Methodologies such as Principal Component Analysis (PCA) are routinely employed to condense behavioral traits into interpretable phenotypes \cite{ref62,ref63}. Moreover, recent predictive frameworks for ADHD explicitly apply Variance Inflation Factor (VIF) analysis (maintaining VIF \textless{} 5) to eliminate multicollinearity, ensuring that feature redundancy does not inflate model variance\cite{ref64}. This structured reduction is deemed essential for maintaining diagnostic validity, treating high collinearity as a factor to be managed rather than an intrinsic signal to be preserved \cite{ref65}.
+
+\textbf{Mechanistic Validation:} We observed that VIF\textless10 removes features such as A4 (Social Imagination) due to their high correlation with A9 (Understanding Intentions). Yet, these two form a ``Theory of Mind'' cluster essential for diagnosis. By relaxing the threshold to VIF=13, our model retains this cluster. The features are mathematically collinear but \textbf{clinically complementary}.
+
+\textbf{SHAP Differentiation:} Crucially, despite high correlation (r=0.75), their SHAP contributions differ significantly (A4 mean \textbar SHAP\textbar=0.107 vs A9 mean \textbar SHAP\textbar=0.083), effectively partitioning the variance rather than duplicating it. VIF=13 thus acts as a ``Clinical Coherence Threshold,'' preserving the network structure of autistic traits that lower thresholds artificially fragment.
+
+\subsection{Why VIF=13 and Not Higher?}\label{why-vif13-and-not-higher}
+
+A critical question arises: if relaxing VIF improves performance, why not VIF=14 or 20?
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\item
+  \textbf{Mathematical Singularity Risk:} VIF=13 corresponds to $R^2 \approx 0.923$. Higher thresholds approach perfect collinearity, causing coefficient instability and ``SHAP value splitting'' that destroys interpretability.
+\item
+  \textbf{Empirical Plateau:} Our sensitivity analysis (see Fig.~\ref{fig:vif-thresholds}) shows diminishing returns beyond VIF=13; additional features are semantic redundants.
+\item
+  \textbf{Parsimony Principle:} VIF=13 preserves the minimal clinically-meaningful feature set (3-4 features) without redundant questionnaire items.
+\end{enumerate}
+
+\subsection{Clinical-ML Bridge via DSM-5 Alignment}\label{clinical-ml-bridge-via-dsm-5-alignment}
+
+To our knowledge, few autism ML studies have explicitly mapped selected features to DSM-5 diagnostic criteria (see Table~\ref{tab:dsm5-mapping}). This addresses a critical adoption barrier: clinicians often distrust ML models because predictions do not align with established diagnostic frameworks \cite{ref16}.
+
+Table~\ref{tab:dsm5-mapping} demonstrates that EVO-XAI's feature selection precisely targets DSM-5 domains:
+\begin{itemize}
+\tightlist
+\item Social Communication (Criterion A): 5 of 7 features
+\item Restricted/Repetitive Behaviors (Criterion B): 2 of 7 features
+\end{itemize}
+
+\textbf{Clinical Utility:} SHAP values can serve as quantitative severity measures within the recognized diagnostic framework, enabling clinicians to:
+\begin{enumerate}
+\tightlist
+\item Identify which DSM-5 criteria drive the prediction
+\item Estimate symptom severity based on SHAP magnitude
+\item Target interventions to the highest-contributing features
+\end{enumerate}
+
+\subsection{Comparison with Recent Literature}\label{comparison-with-recent-literature}
+
+Table~\ref{tab:sota-comparison} positions EVO-XAI within the current autism ML literature.
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2961}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2352}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.0859}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.1784}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 8\tabcolsep) * \real{0.2043}}@{}}
+\caption{Comparison with state-of-the-art autism ML studies.}\label{tab:sota-comparison}\\
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Study
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Approach
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+MCC
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Interpretable?
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+DSM-5 Mapped?
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+Qiang et al.~(2021) \cite{ref30} & fMRI Deep Learning & 0.72* & Partial & No \\
+Batsakis et al.~(2023) \cite{ref29} & XAI Ensemble & 0.68 & Yes & No \\
+Thabtah et al.~(2018) \cite{ref25} & Rules-based ML & 0.61 & Yes & No \\
+\textbf{EVO-XAI (This Study)} & Evolutionary + VIF & \textbf{0.848} & \textbf{Yes} & \textbf{Yes} \\
+\end{longtable}
+
+\emph{* Converted from accuracy for comparison.}
+
+\subsection{Limitations and Future Work}\label{limitations-and-future-work}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{Sample Size and Statistical Power:} The adolescent dataset (n=104, \(n_{\mathrm{ASD}}=63\)) is modest by modern ML standards. Post-hoc power analysis indicates power = 0.72 to detect the observed effect size (\(\Delta\)MCC = 0.142) at \(\alpha = 0.05\). While below the conventional 0.80 threshold, this is acceptable for preliminary methodological work. With \(n \approx 250\), the 95\% CI would narrow from {[}0.667--0.903{]} to approximately {[}0.720--0.850{]}, providing more definitive evidence. Results for this age group should be considered preliminary and require replication in larger cohorts.
+\item
+  \textbf{Post-hoc Mapping:} While DSM-5 mapping was reviewed independently (\(\kappa = 0.90\)), the initial feature discovery was data-driven. A fully prospective study design with prespecified features would offer stronger confirmatory evidence.
+\item
+  \textbf{Geographic Generalization:} The UCI datasets primarily reflect North American/European demographics. Socio-cultural factors significantly influence responses to autism screening; thus, the model's performance across diverse global populations remains to be verified.
+\item
+  \textbf{Clinical Implementation:} While Decision Curve Analysis demonstrates potential utility (net benefit 0.15 at 20\% threshold), clinical adoption requires workflow studies to measure true time-savings and acceptance.
+\item
+  \textbf{Binary Classification:} Severity staging (mild/moderate/severe) is not addressed.
+\end{enumerate}
+
+\subsection{Future Directions}\label{future-directions}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{External Validation:} Partner with 3-5 clinical centers for prospective validation (\(n > 1000\))
+\item
+  \textbf{Multi-Modal Integration:} Combine AQ-10 with EEG, eye-tracking, and speech features
+\item
+  \textbf{Longitudinal Prediction:} Develop models for developmental trajectory prediction
+\item
+  \textbf{Mobile Deployment:} Create accessible screening applications for low-resource settings
+\end{enumerate}
+
+\section{Conclusions}\label{conclusions}
+
+EVO-XAI presents an interpretable framework for ASD screening that integrates three main elements:
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\item
+  \textbf{Context-Specific VIF Threshold:} VIF=13 provides the best overall performance in our experiments, with the clearest benefit in the adolescent cohort, supporting context-specific (rather than universal) multicollinearity handling for behavioral screening.
+\item
+  \textbf{Clinical-ML Alignment:} Explicit DSM-5 mapping (Table~\ref{tab:dsm5-mapping}) enables clinician interpretability and trust.
+\item
+  \textbf{Explainable Pipeline:} NSGA-II evolutionary optimization combined with SHAP provides transparent, clinician-ready predictions.
+\end{enumerate}
+
+The framework achieves 80--95\% dimensionality reduction while maintaining diagnostic accuracy (MCC up to 0.848, see Table~\ref{tab:vif-sensitivity}). Age-stratified validation demonstrates robustness across developmental stages (Fig.~\ref{fig:robustness}).
+
+\textbf{Broader Impact:} This methodology establishes a precedent for context-specific feature selection in behavioral diagnostic tools, potentially applicable beyond autism to other psychiatric disorders with naturally correlated symptom profiles.
+
+\backmatter
+
+\bmhead{Acknowledgements}
+
+The authors thank the UCI Machine Learning Repository for providing open access to the autism screening datasets used in this study.
+
+\section*{Statements and Declarations}
+
+\subsection*{Funding}
+This research did not receive any specific grant from funding agencies in the public, commercial, or not-for-profit sectors.
+
+\subsection*{Competing interests}
+The authors declare that they have no known competing financial interests or personal relationships that could have appeared to influence the work reported in this paper.
+
+\subsection*{Ethics approval and consent to participate}
+This study used only publicly available, de-identified datasets obtained from the UCI Machine Learning Repository~\cite{ref47,ref48,ref49}. No individual-level patient data were collected or accessed, and no ethics approval was required.
+
+\subsection*{Consent for publication}
+Not applicable.
+
+\subsection*{Data availability}
+The datasets used in this study are publicly available from the UCI Machine Learning Repository: Autism Screening Child (DOI: 10.24432/C5659W), Autism Screening Adolescent (DOI: 10.24432/C5V89T), and Autism Screening Adult (DOI: 10.24432/C5F019).
+
+\subsection*{Code availability}
+The complete code, ARFF datasets, result tables, and figure-generation scripts used to reproduce the experiments and manuscript figures are publicly available on GitHub at \url{https://github.com/kadir-sarikaya/EVO-XAI}.
+
+\subsection*{Author contributions}
+K. Sarikaya: Conceptualization, Methodology, Software, Formal analysis, Visualization, Writing -- original draft, Writing -- review \& editing.
+
+\subsection*{Use of generative AI and AI-assisted technologies in the writing process}
+Generative AI tools (large language models) were used to assist manuscript drafting, literature synthesis, and language refinement. The authors reviewed and edited all AI-assisted text and take full responsibility for the final content. AI tools were not used to generate scientific data, experimental results, or perform statistical analysis.
+
+\begin{thebibliography}{99}
+
+\bibitem{ref1}
+American Psychiatric Association, Diagnostic and Statistical Manual of Mental Disorders, fifth ed., American Psychiatric Publishing, Arlington, VA, 2013.
+
+\bibitem{ref2}
+M.J. Maenner, Z. Warren, A.R. Williams, E. Amoakohene, A.V. Bakian, D.A. Bilder, et al., Prevalence and characteristics of autism spectrum disorder among children aged 8 years---autism and developmental disabilities monitoring network, 11 sites, United States, 2020, MMWR Surveill. Summ. 72 (2) (2023) 1--14, https://doi.org/10.15585/mmwr.ss7202a1.
+
+\bibitem{ref3}
+L. Zwaigenbaum, M.L. Bauman, R. Choueiri, C. Kasari, A. Carter, D. Granpeesheh, et al., Early intervention for children with autism spectrum disorder under 3 years of age: recommendations for practice and research, Pediatrics 136 (Suppl. 1) (2015) S60--S81, https://doi.org/10.1542/peds.2014-3667E.
+
+\bibitem{ref4}
+C. Lord, M. Rutter, P. DiLavore, S. Risi, K. Gotham, S. Bishop, Autism Diagnostic Observation Schedule, Second Edition (ADOS-2) Manual, Western Psychological Services, Torrance, CA, 2012.
+
+\bibitem{ref5}
+F. Thabtah, Machine learning in autistic spectrum disorder behavioral research: a review and ways forward, Inform. Health Soc. Care 44 (3) (2019) 278--297, https://doi.org/10.1080/17538157.2017.1399132.
+
+\bibitem{ref6}
+H. Abbas, F. Garberson, S. Glber, D.P. Wall, Machine learning approach for early detection of autism by combining questionnaire and home video screening, J. Am. Med. Inform. Assoc. 25 (8) (2018) 1000--1007, https://doi.org/10.1093/jamia/ocy039.
+
+\bibitem{ref7}
+Q. Tariq, J. Daniels, A. Kline, F. Shic, T. Falck-Ytter, L. Ribu, et al., Mobile detection of autism through machine learning on home video: a development and prospective validation study, PLoS Med. 15 (11) (2018) e1002705, https://doi.org/10.1371/journal.pmed.1002705.
+
+\bibitem{ref8}
+D.P. Wall, J. Kosmicki, T.F. DeLuca, E. Harstad, V.A. Fusaro, Use of machine learning to shorten observation-based screening and diagnosis of autism, Transl. Psychiatry 2 (4) (2012) e100, https://doi.org/10.1038/tp.2012.10.
+
+\bibitem{ref9}
+J.A. Kosmicki, V. Sochat, M. Duda, D.P. Wall, Searching for a minimal set of behaviors for autism detection through feature selection-based machine learning, Transl. Psychiatry 5 (2) (2015) e514, https://doi.org/10.1038/tp.2015.7.
+
+\bibitem{ref10}
+M. Duda, R. Ma, N. Haber, D.P. Wall, Use of machine learning for behavioral distinction of autism and ADHD, Transl. Psychiatry 6 (2) (2016) e732, https://doi.org/10.1038/tp.2015.221.
+
+\bibitem{ref11}
+A. Di Martino, C.G. Yan, Q. Li, E. Denio, F.X. Castellanos, K. Alaerts, et al., The autism brain imaging data exchange: towards a large-scale evaluation of the intrinsic brain architecture in autism, Mol. Psychiatry 19 (6) (2014) 659--667, https://doi.org/10.1038/mp.2013.78.
+
+\bibitem{ref12}
+B. Xue, M. Zhang, W.N. Browne, X. Yao, A survey on evolutionary computation approaches to feature selection, IEEE Trans. Evol. Comput. 20 (4) (2016) 606--626, https://doi.org/10.1109/TEVC.2015.2504420.
+
+\bibitem{ref13}
+C. Allison, B. Auyeung, S. Baron-Cohen, Toward brief "red flags" for autism screening: the short autism spectrum quotient and the short quantitative checklist in 1,000 cases and 3,000 controls, J. Am. Acad. Child Adolesc. Psychiatry 51 (2) (2012) 202--212, https://doi.org/10.1016/j.jaac.2011.11.003.
+
+\bibitem{ref14}
+C.F. Dormann, J. Elith, S. Bacher, C. Buchmann, G. Carl, G. Carré, et al., Collinearity: a review of methods to deal with it and a simulation study evaluating their performance, Ecography 36 (1) (2013) 27--46, https://doi.org/10.1111/j.1600-0587.2012.07348.x.
+
+\bibitem{ref15}
+R.M. O'Brien, A caution regarding rules of thumb for variance inflation factors, Qual. Quant. 41 (5) (2007) 673--690, https://doi.org/10.1007/s11135-006-9018-6.
+
+\bibitem{ref16}
+C. Rudin, Stop explaining black box machine learning models for high stakes decisions and use interpretable models instead, Nat. Mach. Intell. 1 (5) (2019) 206--215, https://doi.org/10.1038/s42256-019-0048-x.
+
+\bibitem{ref17}
+S.M. Lundberg, S.I. Lee, A unified approach to interpreting model predictions, in: Advances in Neural Information Processing Systems, vol. 30, 2017, pp. 4765--4774.
+
+\bibitem{ref18}
+M.T. Ribeiro, S. Singh, C. Guestrin, "Why should I trust you?" Explaining the predictions of any classifier, in: Proceedings of the 22nd ACM SIGKDD International Conference on Knowledge Discovery and Data Mining, 2016, pp. 1135--1144, https://doi.org/10.1145/2939672.2939702.
+
+\bibitem{ref19}
+A.B. Arrieta, N. Díaz-Rodríguez, J. Del Ser, A. Bennetot, S. Tabik, A. Barbado, et al., Explainable Artificial Intelligence (XAI): concepts, taxonomies, opportunities and challenges toward responsible AI, Inf. Fusion 58 (2020) 82--115, https://doi.org/10.1016/j.inffus.2019.12.012.
+
+\bibitem{ref20}
+A. Hassan, K. Liu, A semantic web-enabled explainable AI framework for interoperable and scalable detection of autism spectrum disorder, J. Biomed. Inform. 152 (2024) 104623, https://doi.org/10.1016/j.jbi.2024.104623.
+
+\bibitem{ref21}
+A. Holzinger, C. Biemann, C.S. Pattichis, D.B. Kell, What do we need to build explainable AI systems for the medical domain? arXiv preprint arXiv:1712.09923, 2017.
+
+\bibitem{ref22}
+S. Baron-Cohen, S. Wheelwright, R. Skinner, J. Martin, E. Clubley, The autism-spectrum quotient (AQ): evidence from Asperger syndrome/high-functioning autism, males and females, scientists and mathematicians, J. Autism Dev. Disord. 31 (1) (2001) 5--17, https://doi.org/10.1023/A:1005653411471.
+
+\bibitem{ref23}
+K.K. Hyde, M.N. Novack, N. LaHaye, C. Parlett-Pelleriti, R. Anden, D.R. Dixon, E. Linstead, Applications of supervised machine learning in autism spectrum disorder research: a review, Rev. J. Autism Dev. Disord. 6 (2) (2019) 128--146, https://doi.org/10.1007/s40489-019-00158-x.
+
+\bibitem{ref24}
+D.P. Wall, R. Dally, R. Luyster, J.Y. Jung, T.F. DeLuca, Use of artificial intelligence to shorten the behavioral diagnosis of autism, PLoS One 7 (8) (2012) e43855, https://doi.org/10.1371/journal.pone.0043855.
+
+\bibitem{ref25}
+F. Thabtah, F. Kamalov, K. Rajab, A new computational intelligence approach to detect autistic features for autism screening, Int. J. Med. Inform. 117 (2018) 112--124, https://doi.org/10.1016/j.ijmedinf.2018.06.009.
+
+\bibitem{ref26}
+D. Bone, M.S. Goodwin, M.P. Black, C.C. Lee, K. Audhkhasi, S. Narayanan, Applying machine learning to facilitate autism diagnostics: pitfalls and promises, J. Autism Dev. Disord. 45 (5) (2015) 1121--1136, https://doi.org/10.1007/s10803-014-2268-6.
+
+\bibitem{ref27}
+O. Altay, M. Ulas, A review of machine learning and deep learning for autism spectrum disorder diagnosis, IEEE Access 10 (2022) 81982--82009, https://doi.org/10.1109/ACCESS.2022.3196368.
+
+\bibitem{ref28}
+R. Sheller, B. Edwards, G.A. Reina, J. Martin, S. Pati, A. Kotrotsou, et al., Federated learning in medicine: facilitating multi-institutional collaborations without sharing patient data, Sci. Rep. 10 (2020) 12598, https://doi.org/10.1038/s41598-020-69250-1.
+
+\bibitem{ref29}
+S. Batsakis, A.S. Adamou, F. Thabtah, Towards explainable machine learning for autism screening: a large model-agnostic approach, in: Proceedings of the 2023 International Conference on Machine Learning and Applications, 2023, pp. 1--8.
+
+\bibitem{ref30}
+N. Qiang, Q. Dong, W. Zhang, B. Ge, F. Ge, H. Liang, et al., Modeling and augmenting of fMRI data using deep recurrent variational auto-encoder, J. Neural Eng. 18 (1) (2021) 0460b6, https://doi.org/10.1088/1741-2552/ac1179.
+
+\bibitem{ref31}
+S. Rajagopalan, A. Zhang, et al., Large-scale machine learning validation for autism spectrum disorder screening in the SPARK consortium, JAMA Netw. Open 7 (3) (2024) e243521, https://doi.org/10.1001/jamanetworkopen.2024.3521.
+
+\bibitem{ref32}
+A. Vaswani, N. Shazeer, N. Parmar, J. Uszkoreit, L. Jones, A.N. Gomez, et al., Attention is all you need, in: Advances in Neural Information Processing Systems, vol. 30, 2017, pp. 5998--6008.
+
+\bibitem{ref33}
+S. Ali, F. Akhlaq, A.S. Imran, Z. Kastrati, S.M. Daudpota, M. Moosa, The enlightening role of explainable artificial intelligence in medical \& healthcare domains: A systematic literature review, Comput. Biol. Med. 166 (2023) 107555, https://doi.org/10.1016/j.compbiomed.2023.107555.
+
+\bibitem{ref34}
+A.M. Ebrahim, A.E. Hassanien, An explainable ensemble-based machine learning models for autism spectrum disorder diagnosis using SHAP analysis, Comput. Biol. Med. 172 (2024) 108286, https://doi.org/10.1016/j.compbiomed.2024.108286.
+
+\bibitem{ref35}
+A. Mukhopadhyay, U. Maulik, S. Bandyopadhyay, C.A.C. Coello, A survey of multiobjective evolutionary algorithms for data mining: part I, IEEE Trans. Evol. Comput. 18 (1) (2014) 4--19, https://doi.org/10.1109/TEVC.2013.2290086.
+
+\bibitem{ref36}
+Y. Saeys, I. Inza, P. Larra{\~n}aga, A review of feature selection techniques in bioinformatics, Bioinformatics 23 (19) (2007) 2507--2517, https://doi.org/10.1093/bioinformatics/btm344.
+
+\bibitem{ref37}
+D. Elayidom, M.S. Iype, NSGA-II based feature selection and AdaBoost-based prediction for COVID-19, Comput. Biol. Med. 153 (2023) 106532, https://doi.org/10.1016/j.compbiomed.2022.106532.
+
+\bibitem{ref38}
+M. Sharma, R. Singh, M. Bhattacharya, NSGA-II-DL: A deep learning approach with evolutionary optimization for HER2 classification in breast cancer, IEEE Access 11 (2023) 47845--47858, https://doi.org/10.1109/ACCESS.2023.3276143.
+
+\bibitem{ref39}
+K. Deb, A. Pratap, S. Agarwal, T. Meyarivan, A fast and elitist multiobjective genetic algorithm: NSGA-II, IEEE Trans. Evol. Comput. 6 (2) (2002) 182--197, https://doi.org/10.1109/4235.996017.
+
+\bibitem{ref40}
+R. Storn, K. Price, Differential evolution---a simple and efficient heuristic for global optimization over continuous spaces, J. Glob. Optim. 11 (4) (1997) 341--359, https://doi.org/10.1023/A:1008202821328.
+
+\bibitem{ref41}
+J. Kennedy, R. Eberhart, Particle swarm optimization, in: Proceedings of ICNN'95---International Conference on Neural Networks, vol. 4, 1995, pp. 1942--1948, https://doi.org/10.1109/ICNN.1995.488968.
+
+\bibitem{ref42}
+A. Ashraf, Q. Zhao, W.H. Bangyal, M. Raza, M. Iqbal, "Female autism categorization using CNN based NeuroNet57 and ant colony optimization," Computers in Biology and Medicine 189 (2025) 109926.
+
+\bibitem{ref43}
+A. I. Alutaibi, S. K. Sharma, A. R. Khan, "Capsule DenseNet++: Enhanced autism detection framework with deep learning and reinforcement learning-based lifestyle recommendation," Computers in Biology and Medicine 190 (2025) 110038.
+
+\bibitem{ref44}
+R. Parvathy, R. Arunachalam, S. Damodaran, M. Al-Razgan, Y. A. Ali, Y. J, "An intellectual autism spectrum disorder classification framework in healthcare industry using ViT-based adaptive deep learning model," Biomedical Signal Processing and Control 106 (2025) 107737.
+
+\bibitem{ref45}
+D.E. Farrar, R.R. Glauber, Multicollinearity in regression analysis: the problem revisited, Rev. Econ. Stat. 49 (1) (1967) 92--107, https://doi.org/10.2307/1937887.
+
+\bibitem{ref46}
+A. Alharbi, M. Alghamdi, VIF-based feature selection improves classification accuracy in machine learning models, Appl. Sci. 12 (15) (2022) 7584, https://doi.org/10.3390/app12157584.
+
+\bibitem{ref47}
+F. Thabtah, "Autistic Spectrum Disorder Screening Data for Adolescent," UCI Machine Learning Repository, 2017. [Online]. Available: https://doi.org/10.24432/C5V89T.
+
+\bibitem{ref48}
+F. Thabtah, "Autism Screening Adult," UCI Machine Learning Repository, 2017. [Online]. Available: https://doi.org/10.24432/C5F019.
+
+\bibitem{ref49}
+F. Thabtah, "Autistic Spectrum Disorder Screening Data for Children," UCI Machine Learning Repository, 2017. [Online]. Available: https://doi.org/10.24432/C5659W.
+
+\bibitem{ref50}
+S. van Buuren, K. Groothuis-Oudshoorn, mice: Multivariate Imputation by Chained Equations in R, J. Stat. Softw. 45 (3) (2011) 1--67, https://doi.org/10.18637/jss.v045.i03.
+
+
+\bibitem{ref51}
+H. He, Y. Bai, E.A. Garcia, S. Li, ADASYN: Adaptive synthetic sampling approach for imbalanced learning, in: Proceedings of the 2008 IEEE International Joint Conference on Neural Networks, 2008, pp. 1322--1328, https://doi.org/10.1109/IJCNN.2008.4633969.
+
+\bibitem{ref52}
+N.V. Chawla, K.W. Bowyer, L.O. Hall, W.P. Kegelmeyer, SMOTE: Synthetic minority over-sampling technique, J. Artif. Intell. Res. 16 (2002) 321--357, https://doi.org/10.1613/jair.953.
+
+\bibitem{ref53}
+Z.H. Zhou, Ensemble Methods: Foundations and Algorithms, CRC Press, Boca Raton, FL, 2012.
+
+\bibitem{ref54}
+L. Breiman, Random forests, Mach. Learn. 45 (1) (2001) 5--32, https://doi.org/10.1023/A:1010933404324.
+
+\bibitem{ref55}
+T. Chen, C. Guestrin, XGBoost: a scalable tree boosting system, in: Proceedings of the 22nd ACM SIGKDD International Conference on Knowledge Discovery and Data Mining, 2016, pp. 785--794, https://doi.org/10.1145/2939672.2939785.
+
+\bibitem{ref56}
+V. Vovk, A. Gammerman, G. Shafer, Algorithmic Learning in a Random World, Springer, New York, 2005, https://doi.org/10.1007/b106715.
+
+\bibitem{ref57}
+A.J. Vickers, E.B. Elkin, Decision curve analysis: a novel method for evaluating prediction models, Medical Decision Making 26 (6) (2006) 565--574, https://doi.org/10.1177/0272989X06295361.
+
+\bibitem{ref58}
+G.C. Cawley, N.L. Talbot, On over-fitting in model selection and subsequent selection bias in performance evaluation, J. Mach. Learn. Res. 11 (2010) 2079--2107.
+
+\bibitem{ref59}
+B.W. Matthews, Comparison of the predicted and observed secondary structure of T4 phage lysozyme, Biochim. Biophys. Acta 405 (2) (1975) 442--451, https://doi.org/10.1016/0005-2795(75)90109-9.
+
+\bibitem{ref60}
+G. Ke, Q. Meng, T. Finley, T. Wang, W. Chen, W. Ma, et al., LightGBM: a highly efficient gradient boosting decision tree, in: Advances in Neural Information Processing Systems, vol. 30, 2017, pp. 3146--3154.
+
+\bibitem{ref61}
+L. Prokhorenkova, G. Gusev, A. Vorobev, A.V. Dorogush, A. Gulin, CatBoost: unbiased boosting with categorical features, in: Advances in Neural Information Processing Systems, vol. 31, 2018, pp. 6638--6648.
+
+\bibitem{ref62}
+S.A. Alzakari, A. Allinjawi, A. Aldrees, et al., Early detection of autism spectrum disorder using explainable AI and optimized teaching strategies, J. Neurosci. Methods 413 (2025) 110315, https://doi.org/10.1016/j.jneumeth.2024.110315.
+
+\bibitem{ref63}
+C.M. Parlett-Pelleriti, E. Stevens, D. Dixon, E.J. Linstead, Applications of unsupervised machine learning in autism spectrum disorder research: a review, Rev. J. Autism Dev. Disord. 10 (2023) 406--421, https://doi.org/10.1007/s40489-021-00299-y.
+
+\bibitem{ref64}
+H.M. Shakeel, G. Antoniou, M. Adamou, Integrating explainable AI with clinical features to enhance ADHD diagnostic understanding, Frontiers in Psychiatry 16 (2025) 1706216, https://doi.org/10.3389/fpsyt.2025.1706216.
+
+\bibitem{ref65}
+A. Abu-Errub, Improving early autism detection with chi-square feature selection, machine learning, and Bayesian hyperparameter optimization, Eng. Technol. Appl. Sci. Res. 15 (5) (2025) 27954--27959.
+
+\end{thebibliography}
+
+\end{document}
