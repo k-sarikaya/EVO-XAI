@@ -1,6 +1,6 @@
 # EVO-XAI: Explainable AI Framework for Autism Spectrum Disorder Screening
 
-**GitHub Repository:** [https://github.com/kadir-sarikaya/EVO-XAI](https://github.com/kadir-sarikaya/EVO-XAI)
+**GitHub Repository:** [https://github.com/k-sarikaya/EVO-XAI](https://github.com/k-sarikaya/EVO-XAI)
 **License:** [Creative Commons Attribution 4.0 International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/)
 
 This repository contains the complete reproducibility package for the **EVO-XAI** framework, as presented in the manuscript submitted to the *Journal of Healthcare Informatics Research* (JHIR).
@@ -44,8 +44,8 @@ python .\code\verify_nsga2_vif13.py
 
 ## 4. Citation
 If you use this framework or data in your research, please cite:
-> [Citation placeholder - to be updated post-publication in Journal of Healthcare Informatics Research]
+> [Citation placeholder - to be updated post-publication ]
 
 ---
-**Maintained by:** Kadir Sarikaya  
-**Contact:** kadir.sarikaya@gop.edu.tr
+**Maintained by:** -------  
+**Contact:** ------
